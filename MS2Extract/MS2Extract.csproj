@@ -95,10 +95,6 @@
       <Project>{9778a7c2-4c51-4b53-be42-d0fc44f78bee}</Project>
       <Name>MiscUtils</Name>
     </ProjectReference>
-    <ProjectReference Include="..\..\MS2Lib\InteropDecrypt\InteropDecrypt.csproj">
-      <Project>{1f35676d-f99b-414b-9412-6020f115792f}</Project>
-      <Name>InteropDecrypt</Name>
-    </ProjectReference>
     <ProjectReference Include="..\..\MS2Lib\MS2Lib\MS2Lib.csproj">
       <Project>{e03e993c-7e8e-4fa3-88c1-d4d1dc081075}</Project>
       <Name>MS2Lib</Name>
