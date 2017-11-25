@@ -162,6 +162,13 @@ namespace MS2Extract
             string fileDestinationPath = Path.Combine(destinationPath, file.Name);
 
             Logger.Info($"Extracting file \"{file.Name}\", \"{FileEx.FormatStorage(file.Size)}\". ({file.Id}/{files.Count})");
+
+            if (file.Name == String.Empty)
+            {
+                Logger.Warning($"File number \"{file.Id}\", \"{FileEx.FormatStorage(file.Size)}\" has no name and will be ignored.");
+                return;
+            }
+
             using (Stream stream = await file.GetStreamAsync().ConfigureAwait(false))
             {
                 await stream.CopyToAsync(fileDestinationPath).ConfigureAwait(false);
