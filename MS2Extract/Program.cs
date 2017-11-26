@@ -1,6 +1,5 @@
 ﻿using System;
 using System.Collections.Generic;
-using System.Collections.ObjectModel;
 using System.IO;
 using System.Linq;
 using System.Text;
@@ -135,43 +134,51 @@ namespace MS2Extract
 
         private static async Task ExtractArchiveAsync(string headerFile, string dataFile, string destinationPath)
         {
-            using (MS2Archive archive = await MS2Archive.Create(headerFile, dataFile).ConfigureAwait(false))
+            using (MS2Archive archive = await MS2Archive.Load(headerFile, dataFile).ConfigureAwait(false))
             {
-                ReadOnlyCollection<MS2File> files = archive.Files;
-
+                List<MS2File> files = archive.Files;
 #if DEBUG
                 for (int i = 0; i < files.Count; i++)
                 {
-                    await ExtractFileAsync(dataFile, destinationPath, files, i).ConfigureAwait(false);
+                    await ExtractFileAsync(destinationPath, files, i).ConfigureAwait(false);
                 }
 #else
                 Task[] tasks = new Task[files.Count];
                 for (int i = 0; i < files.Count; i++)
                 {
-                    tasks[i] = ExtractFileAsync(dataFile, destinationPath, files, i);
+                    tasks[i] = ExtractFileAsync(destinationPath, files, i);
                 }
                 await Task.WhenAll(tasks).ConfigureAwait(false);
 #endif
             }
         }
 
-        private static async Task ExtractFileAsync(string dataFile, string destinationPath, ReadOnlyCollection<MS2File> files, int i)
+        private static async Task ExtractFileAsync(string destinationPath, List<MS2File> files, int i)
         {
             MS2File file = files[i];
 
             string fileDestinationPath = Path.Combine(destinationPath, file.Name);
 
-            Logger.Info($"Extracting file \"{file.Name}\", \"{FileEx.FormatStorage(file.Size)}\". ({file.Id}/{files.Count})");
+            Logger.Info($"Extracting file \"{file.Name}\", \"{FileEx.FormatStorage(file.Header.Size)}\". ({file.Id}/{files.Count})");
 
             if (file.Name == String.Empty)
             {
-                Logger.Warning($"File number \"{file.Id}\", \"{FileEx.FormatStorage(file.Size)}\" has no name and will be ignored.");
+                Logger.Warning($"File number \"{file.Id}\", \"{FileEx.FormatStorage(file.Header.Size)}\" has no name and will be ignored.");
                 return;
             }
+            
+            (Stream stream, bool shouldDispose) = await file.GetDecryptedStreamAsync().ConfigureAwait(false);
 
-            using (Stream stream = await file.GetStreamAsync().ConfigureAwait(false))
+            try
             {
                 await stream.CopyToAsync(fileDestinationPath).ConfigureAwait(false);
+            }
+            finally
+            {
+                if (shouldDispose)
+                {
+                    stream.Dispose();
+                }
             }
         }
 
