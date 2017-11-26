@@ -214,7 +214,7 @@ namespace MS2Extract
             sb.AppendLine();
             sb.AppendLine("MS2Extract Copyright (C) 2017-2018 Miyu");
             sb.AppendLine("Description: ");
-            sb.AppendLine("Extracts Maplestory2 archives in a given folder.");
+            sb.AppendLine("Extracts MapleStory2 archives in a given folder.");
             sb.AppendLine();
             sb.AppendLine("Usage: ");
             sb.AppendLine("MS2Extract.exe <source> <destination>");
