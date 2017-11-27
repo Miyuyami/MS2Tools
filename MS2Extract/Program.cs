@@ -159,7 +159,7 @@ namespace MS2Extract
 
             string fileDestinationPath = Path.Combine(destinationPath, file.Name);
 
-            Logger.Info($"Extracting file \"{file.Name}\", \"{FileEx.FormatStorage(file.Header.Size)}\". ({file.Id}/{files.Count})");
+            Logger.Info($"Extracting file \"{file.Name}\", \"{FileEx.FormatStorage(file.Header.Size)}\". ({file.Header.Id}/{files.Count})");
 
             if (file.Name == String.Empty)
             {
