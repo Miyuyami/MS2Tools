@@ -99,9 +99,9 @@ namespace MS2Extract
 
             foreach ((string headerFile, string dataFile) in GetFiles(sourcePath))
             {
-                if (!sourcePath.EndsWith(@"\"))
+                if (!sourcePath.EndsWith(Path.DirectorySeparatorChar.ToString()))
                 {
-                    sourcePath += @"\";
+                    sourcePath += Path.DirectorySeparatorChar;
                 }
 
                 string dstPath = Path.Combine(destinationPath, Path.GetDirectoryName(headerFile.Replace(sourcePath, String.Empty)));
@@ -140,33 +140,33 @@ namespace MS2Extract
 #if DEBUG
                 for (int i = 0; i < files.Count; i++)
                 {
-                    await ExtractFileAsync(destinationPath, files, i).ConfigureAwait(false);
+                    MS2File file = files[i];
+                    Logger.Info($"Extracting file \"{file.Name}\", \"{FileEx.FormatStorage(file.Header.Size)}\". ({file.Header.Id}/{files.Count})");
+                    await ExtractFileAsync(destinationPath, file).ConfigureAwait(false);
                 }
 #else
                 Task[] tasks = new Task[files.Count];
                 for (int i = 0; i < files.Count; i++)
                 {
-                    tasks[i] = ExtractFileAsync(destinationPath, files, i);
+                    MS2File file = files[i];
+                    Logger.Info($"Extracting file \"{file.Name}\", \"{FileEx.FormatStorage(file.Header.Size)}\". ({file.Header.Id}/{files.Count})");
+                    tasks[i] = ExtractFileAsync(destinationPath, file);
                 }
                 await Task.WhenAll(tasks).ConfigureAwait(false);
 #endif
             }
         }
 
-        private static async Task ExtractFileAsync(string destinationPath, List<MS2File> files, int i)
+        private static async Task ExtractFileAsync(string destinationPath, MS2File file)
         {
-            MS2File file = files[i];
-
-            string fileDestinationPath = Path.Combine(destinationPath, file.Name);
-
-            Logger.Info($"Extracting file \"{file.Name}\", \"{FileEx.FormatStorage(file.Header.Size)}\". ({file.Header.Id}/{files.Count})");
-
             if (file.Name == String.Empty)
             {
                 Logger.Warning($"File number \"{file.Id}\", \"{FileEx.FormatStorage(file.Header.Size)}\" has no name and will be ignored.");
                 return;
             }
             
+            string fileDestinationPath = Path.Combine(destinationPath, file.Name);
+
             (Stream stream, bool shouldDispose) = await file.GetDecryptedStreamAsync().ConfigureAwait(false);
 
             try
@@ -219,9 +219,9 @@ namespace MS2Extract
             sb.AppendLine("Usage: ");
             sb.AppendLine("MS2Extract.exe <source> <destination>");
             sb.AppendLine("<source> - either a directory to extract all archives, ");
-            sb.AppendLine("either a specific archive");
+            sb.AppendLine("either a specific archive.");
             sb.AppendLine("<destination> - the folder where all the files from");
-            sb.AppendLine("the archive will be extracted");
+            sb.AppendLine("the archive will be extracted.");
 
             Console.WriteLine(sb.ToString());
         }
