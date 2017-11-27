@@ -6,6 +6,7 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 using MiscUtils;
+using MiscUtils.IO;
 using MS2Lib;
 using Logger = MiscUtils.Logging.SimpleLogger;
 using LogMode = MiscUtils.Logging.LogMode;
@@ -198,16 +199,9 @@ namespace MS2FileHeaderExporter
 
             FileTypes.AddOrUpdate(Path.GetExtension(fileName), new HashSet<string>() { typeId.ToString() }, (_, v) => { v.Add(typeId.ToString()); return v; });
 
-            string rootDirectory = fileName;
-            if (rootDirectory[0] == '/' || rootDirectory[0] == '\\')
+            string rootDirectory = PathEx.GetRootDirectory(fileName);
+            if (!String.IsNullOrEmpty(rootDirectory))
             {
-                rootDirectory = rootDirectory.Substring(1);
-            }
-
-            int index;
-            if ((index = rootDirectory.IndexOfAny('/', '\\')) != -1)
-            {
-                rootDirectory = rootDirectory.Substring(0, index);
                 if (String.IsNullOrEmpty(file.InfoHeader.RootFolderId))
                 {
                     Logger.Warning($"Root folder id is empty but it has a root folder ({rootDirectory})!");
