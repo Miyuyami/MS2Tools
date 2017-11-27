@@ -1,9 +1,11 @@
 ﻿using System;
+using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
+using MiscUtils;
 using MS2Lib;
 using Logger = MiscUtils.Logging.SimpleLogger;
 using LogMode = MiscUtils.Logging.LogMode;
@@ -16,7 +18,15 @@ namespace MS2FileHeaderExporter
         private const string DataFileExtension = "m2d";
 
         private const string HeaderExportFileName = "exported_file_header.txt";
-        private const string DirectorySeparator = "_";
+        private const string DirectorySeparatorForExportFileName = "_";
+
+        private static readonly ConcurrentDictionary<string, HashSet<string>> FileTypes = new ConcurrentDictionary<string, HashSet<string>>();
+        private const string FileTypeMapFileName = "file_types.map";
+        private const int FileTypesKeyPadding = 12;
+
+        private static readonly ConcurrentDictionary<string, HashSet<string>> RootFolderIds = new ConcurrentDictionary<string, HashSet<string>>();
+        private const string RootFolderIdMapFileName = "root_folder_id.map";
+        private const int RootFolderIdsKeyPadding = 24;
 
         private const int MinArgsLength = 2;
 
@@ -91,6 +101,27 @@ namespace MS2FileHeaderExporter
                     return;
                 }
             }
+
+            var fileTypesList = FileTypes.ToList();
+            fileTypesList.Sort((kvp1, kvp2) => kvp1.Key.CompareTo(kvp2.Key));
+            var rootFolderIdList = RootFolderIds.ToList();
+            rootFolderIdList.Sort((kvp1, kvp2) => kvp1.Key.CompareTo(kvp2.Key));
+
+            using (var sw = new StreamWriter(Path.Combine(DestinationPath, FileTypeMapFileName)))
+            {
+                foreach (KeyValuePair<string, HashSet<string>> kvp in fileTypesList)
+                {
+                    await sw.WriteLineAsync(kvp.Key.PadRight(FileTypesKeyPadding) + " - " + String.Join(", ", kvp.Value)).ConfigureAwait(false);
+                }
+            }
+
+            using (var sw = new StreamWriter(Path.Combine(DestinationPath, RootFolderIdMapFileName)))
+            {
+                foreach (KeyValuePair<string, HashSet<string>> kvp in rootFolderIdList)
+                {
+                    await sw.WriteLineAsync(kvp.Key.PadRight(RootFolderIdsKeyPadding) + " - " + String.Join(", ", kvp.Value)).ConfigureAwait(false);
+                }
+            }
         }
 
         private static async Task ExportArchivesInDirectoryAsync(string sourcePath, string destinationPath)
@@ -107,8 +138,8 @@ namespace MS2FileHeaderExporter
                     sourcePath += Path.DirectorySeparatorChar;
                 }
 
-                string directoryNames = Path.GetDirectoryName(headerFile.Replace(sourcePath, String.Empty)).Replace(Path.DirectorySeparatorChar.ToString(), DirectorySeparator);
-                string destinationFilePath = Path.Combine(destinationPath, String.Join(DirectorySeparator, directoryNames, Path.GetFileNameWithoutExtension(headerFile), HeaderExportFileName));
+                string directoryNames = Path.GetDirectoryName(headerFile.Replace(sourcePath, String.Empty)).Replace(Path.DirectorySeparatorChar.ToString(), DirectorySeparatorForExportFileName);
+                string destinationFilePath = Path.Combine(destinationPath, String.Join(DirectorySeparatorForExportFileName, directoryNames, Path.GetFileNameWithoutExtension(headerFile), HeaderExportFileName));
 
                 await CreateExportArchiveAsync(destinationFilePath, headerFile, dataFile).ConfigureAwait(false);
             }
@@ -124,7 +155,7 @@ namespace MS2FileHeaderExporter
             }
 
             string dataFile = GetDataFileFromHeaderFile(headerFile);
-            string destinationFilePath = Path.Combine(destinationPath, String.Join(DirectorySeparator, Path.GetFileNameWithoutExtension(headerFile), HeaderExportFileName));
+            string destinationFilePath = Path.Combine(destinationPath, String.Join(DirectorySeparatorForExportFileName, Path.GetFileNameWithoutExtension(headerFile), HeaderExportFileName));
 
             return CreateExportArchiveAsync(destinationFilePath, headerFile, dataFile);
         }
@@ -153,10 +184,37 @@ namespace MS2FileHeaderExporter
 
         private static Task ExportFileAsync(StreamWriter swExport, MS2File file)
         {
+            string fileName = file.Name;
+            if (String.IsNullOrWhiteSpace(fileName))
+            {
+                Logger.Warning($"File number \"{file.Id}\" has no name and will be ignored.");
+                return Task.CompletedTask;
+            }
+
             uint id = file.Header.Id;
             uint typeId = file.Header.TypeId;
             int propCount = file.InfoHeader.Properties.Count;
             string info = String.Join(",", file.InfoHeader.Properties);
+
+            FileTypes.AddOrUpdate(Path.GetExtension(fileName), new HashSet<string>() { typeId.ToString() }, (_, v) => { v.Add(typeId.ToString()); return v; });
+
+            string rootDirectory = fileName;
+            if (rootDirectory[0] == '/' || rootDirectory[0] == '\\')
+            {
+                rootDirectory = rootDirectory.Substring(1);
+            }
+
+            int index;
+            if ((index = rootDirectory.IndexOfAny('/', '\\')) != -1)
+            {
+                rootDirectory = rootDirectory.Substring(0, index);
+                if (String.IsNullOrEmpty(file.InfoHeader.RootFolderId))
+                {
+                    Logger.Warning($"Root folder id is empty but it has a root folder ({rootDirectory})!");
+                }
+
+                RootFolderIds.AddOrUpdate(rootDirectory, new HashSet<string>() { file.InfoHeader.RootFolderId }, (_, v) => { v.Add(file.InfoHeader.RootFolderId); return v; });
+            }
 
             return swExport.WriteLineAsync($"{id:d6} - Type:{typeId}; Properties:{propCount}; Info={info}");
         }
