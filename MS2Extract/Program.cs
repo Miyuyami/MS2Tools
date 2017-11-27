@@ -159,7 +159,7 @@ namespace MS2Extract
 
         private static async Task ExtractFileAsync(string destinationPath, MS2File file)
         {
-            if (file.Name == String.Empty)
+            if (String.IsNullOrWhiteSpace(file.Name))
             {
                 Logger.Warning($"File number \"{file.Id}\", \"{FileEx.FormatStorage(file.Header.Size)}\" has no name and will be ignored.");
                 return;
