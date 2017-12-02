@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
@@ -76,10 +77,14 @@ namespace MS2Create
         private static Task CreateArchiveAsync(string sourcePath, string destinationPath)
         {
             string dstArchive = Path.Combine(destinationPath, ArchiveName);
-            return CreateArchiveAsync(sourcePath, Path.Combine(dstArchive, HeaderFileExtension), Path.Combine(dstArchive, DataFileExtension));
+            string headerPath = Path.ChangeExtension(dstArchive, HeaderFileExtension);
+            string dataPath = Path.ChangeExtension(dstArchive, DataFileExtension);
+            Logger.Info($"Archiving folder \"{SourcePath}\" into \"{headerPath}\" and \"{dataPath}\"");
+
+            return CreateArchiveAsync(sourcePath, headerPath, dataPath);
         }
 
-        private static Task CreateArchiveAsync(string sourcePath, string headerFilePath, string dataFilePath)
+        private static async Task CreateArchiveAsync(string sourcePath, string headerFilePath, string dataFilePath)
         {
             if (!Directory.Exists(sourcePath))
             {
@@ -87,14 +92,22 @@ namespace MS2Create
             }
 
             var filePaths = GetFilesRelative(sourcePath);
-            List<MS2File> files = new List<MS2File>(filePaths.Length);
+            MS2File[] files = new MS2File[filePaths.Length];
+            var tasks = new Task[filePaths.Length];
+
             for (uint i = 0; i < filePaths.Length; i++)
             {
-                var (filePath, relativePath) = filePaths[i];
-                files.Add(MS2File.Create(i + 1u, relativePath, CompressionType.Zlib, CryptoMode, filePath));
+                uint ic = i;
+                tasks[i] = Task.Run(() =>
+                {
+                    var (filePath, relativePath) = filePaths[ic];
+                    files[i] = MS2File.Create(ic + 1u, relativePath, CompressionType.Zlib, CryptoMode, filePath);
+                });
             }
 
-            return MS2Archive.Save(CryptoMode, files, headerFilePath, dataFilePath, RunMode.Async2);
+            await Task.WhenAll(tasks).ConfigureAwait(false);
+
+            await MS2Archive.Save(CryptoMode, files, headerFilePath, dataFilePath, RunMode.Async2).ConfigureAwait(false);
         }
 
         private static (string FullPath, string RelativePath)[] GetFilesRelative(string path)
