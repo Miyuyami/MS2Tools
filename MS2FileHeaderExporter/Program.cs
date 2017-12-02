@@ -193,9 +193,7 @@ namespace MS2FileHeaderExporter
             }
 
             uint id = file.Header.Id;
-            uint typeId = file.Header.TypeId;
-            int propCount = file.InfoHeader.Properties.Count;
-            string info = String.Join(",", file.InfoHeader.Properties);
+            CompressionType typeId = file.CompressionType;
 
             FileTypes.AddOrUpdate(Path.GetExtension(fileName), new HashSet<string>() { typeId.ToString() }, (_, v) => { v.Add(typeId.ToString()); return v; });
 
@@ -210,6 +208,8 @@ namespace MS2FileHeaderExporter
                 RootFolderIds.AddOrUpdate(rootDirectory, new HashSet<string>() { file.InfoHeader.RootFolderId }, (_, v) => { v.Add(file.InfoHeader.RootFolderId); return v; });
             }
 
+            int propCount = file.InfoHeader.Properties.Count;
+            string info = String.Join(",", file.InfoHeader.Properties);
             return swExport.WriteLineAsync($"{id:d6} - Type:{typeId}; Properties:{propCount}; Info={info}");
         }
 
