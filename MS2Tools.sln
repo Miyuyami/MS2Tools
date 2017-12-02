@@ -1,7 +1,7 @@
 ﻿
 Microsoft Visual Studio Solution File, Format Version 12.00
 # Visual Studio 15
-VisualStudioVersion = 15.0.27004.2009
+VisualStudioVersion = 15.0.27004.2010
 MinimumVisualStudioVersion = 10.0.40219.1
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "MS2Extract", "MS2Extract\MS2Extract.csproj", "{312FB554-77D7-456B-88F6-A0C7C7CA673B}"
 EndProject
@@ -16,6 +16,8 @@ EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "MS2Create", "MS2Create\MS2Create.csproj", "{1589C1E0-ED9D-4E5A-A617-46A43243B4CD}"
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "MS2FileHeaderExporter", "MS2FileHeaderExporter\MS2FileHeaderExporter.csproj", "{8EABEEB0-FF5B-4B4F-B9EA-0A43989805FE}"
+EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "MS2Lib", "MS2Lib", "{99F0437D-D027-4818-9197-FAA1AEE55105}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -112,6 +114,11 @@ Global
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
+	EndGlobalSection
+	GlobalSection(NestedProjects) = preSolution
+		{E03E993C-7E8E-4FA3-88C1-D4D1DC081075} = {99F0437D-D027-4818-9197-FAA1AEE55105}
+		{1F35676D-F99B-414B-9412-6020F115792F} = {99F0437D-D027-4818-9197-FAA1AEE55105}
+		{74437649-BB70-41F0-8026-27A567443AE1} = {99F0437D-D027-4818-9197-FAA1AEE55105}
 	EndGlobalSection
 	GlobalSection(ExtensibilityGlobals) = postSolution
 		SolutionGuid = {9C96CD25-77D1-4CA9-8B27-7AB1D6004F13}
