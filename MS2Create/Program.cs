@@ -1,6 +1,4 @@
 ﻿using System;
-using System.Collections.Concurrent;
-using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Text;
@@ -76,6 +74,7 @@ namespace MS2Create
 
         private static Task CreateArchiveAsync(string sourcePath, string destinationPath)
         {
+            Directory.CreateDirectory(destinationPath);
             string dstArchive = Path.Combine(destinationPath, ArchiveName);
             string headerPath = Path.ChangeExtension(dstArchive, HeaderFileExtension);
             string dataPath = Path.ChangeExtension(dstArchive, DataFileExtension);
@@ -101,7 +100,7 @@ namespace MS2Create
                 tasks[i] = Task.Run(() =>
                 {
                     var (filePath, relativePath) = filePaths[ic];
-                    files[i] = MS2File.Create(ic + 1u, relativePath, CompressionType.Zlib, CryptoMode, filePath);
+                    files[ic] = MS2File.Create(ic + 1u, relativePath, CompressionType.Zlib, CryptoMode, filePath);
                 });
             }
 
