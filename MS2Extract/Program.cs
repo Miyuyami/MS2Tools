@@ -104,7 +104,7 @@ namespace MS2Extract
                     sourcePath += Path.DirectorySeparatorChar;
                 }
 
-                string dstPath = Path.Combine(destinationPath, Path.GetDirectoryName(headerFile.Replace(sourcePath, String.Empty)));
+                string dstPath = Path.Combine(destinationPath, Path.GetDirectoryName(headerFile.Remove(sourcePath)));
                 await CreateExtractArchiveAsync(dstPath, headerFile, dataFile).ConfigureAwait(false);
             }
         }
@@ -245,7 +245,7 @@ namespace MS2Extract
 
             if (args.Length > MinArgsLength)
             {
-                ArgsLogMode = (LogMode)Enum.Parse(typeof(LogMode), args[2]);
+                ArgsLogMode = (LogMode)Enum.Parse(typeof(LogMode), args[MinArgsLength + 0]);
             }
 
             return true;

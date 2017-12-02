@@ -139,7 +139,7 @@ namespace MS2FileHeaderExporter
                     sourcePath += Path.DirectorySeparatorChar;
                 }
 
-                string directoryNames = Path.GetDirectoryName(headerFile.Replace(sourcePath, String.Empty)).Replace(Path.DirectorySeparatorChar.ToString(), DirectorySeparatorForExportFileName);
+                string directoryNames = Path.GetDirectoryName(headerFile.Remove(sourcePath)).Replace(Path.DirectorySeparatorChar.ToString(), DirectorySeparatorForExportFileName);
                 string destinationFilePath = Path.Combine(destinationPath, String.Join(DirectorySeparatorForExportFileName, directoryNames, Path.GetFileNameWithoutExtension(headerFile), HeaderExportFileName));
 
                 await CreateExportArchiveAsync(destinationFilePath, headerFile, dataFile).ConfigureAwait(false);
@@ -276,7 +276,7 @@ namespace MS2FileHeaderExporter
 
             if (args.Length > MinArgsLength)
             {
-                ArgsLogMode = (LogMode)Enum.Parse(typeof(LogMode), args[2]);
+                ArgsLogMode = (LogMode)Enum.Parse(typeof(LogMode), args[MinArgsLength + 0]);
             }
 
             return true;
