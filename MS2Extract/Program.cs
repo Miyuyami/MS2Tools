@@ -1,28 +1,37 @@
-﻿using System;
+﻿using MiscUtils;
+using MiscUtils.IO;
+using MS2Lib;
+using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
-using MiscUtils;
-using MiscUtils.IO;
-using MS2Lib;
 using Logger = MiscUtils.Logging.SimpleLogger;
 using LogMode = MiscUtils.Logging.LogMode;
 
 namespace MS2Extract
 {
+    public enum SyncMode
+    {
+        Sync = 0,
+        Async = 1,
+    }
+
     internal class Program
     {
         private const string HeaderFileExtension = "m2h";
         private const string DataFileExtension = "m2d";
 
-        private const int MinArgsLength = 2;
+        private const int MinNumberArgs = 2;
+        private const int OptionalNumberArgSyncMode = 3;
+        private const int OptionalNumberArgLog = 4;
 
         // args
         private static string SourcePath;
         private static string DestinationPath;
         private static LogMode? ArgsLogMode;
+        private static SyncMode? ArgsSyncMode;
 
 #if DEBUG
         private static readonly StreamWriter StreamWriter = new StreamWriter("output.log");
@@ -34,6 +43,7 @@ namespace MS2Extract
             Action<string, object[]> Out = (format, args) => StreamWriter.WriteLine(args == null ? format : String.Format(format, args));
             Logger.Out = MiscUtils.Logging.DebugLogger.Out = Out;
             Logger.LoggingLevel = LogMode.Debug;
+            ArgsSyncMode = SyncMode.Sync;
 #else
             Logger.LoggingLevel = LogMode.Warning;
 #endif
@@ -129,7 +139,14 @@ namespace MS2Extract
             Directory.CreateDirectory(dstPath);
 
             Logger.Verbose($"Starting extraction of: header \"{headerFile}\", data \"{dataFile}\".");
-            return ExtractArchiveAsync(headerFile, dataFile, dstPath);
+            if (ArgsSyncMode == SyncMode.Async)
+            {
+                return ExtractArchiveAsync(headerFile, dataFile, dstPath);
+            }
+            else //if (ArgsSyncMode == SyncMode.Sync)
+            {
+                return ExtractArchiveSync(headerFile, dataFile, dstPath);
+            }
         }
 
         private static async Task ExtractArchiveAsync(string headerFile, string dataFile, string destinationPath)
@@ -137,14 +154,7 @@ namespace MS2Extract
             using (MS2Archive archive = await MS2Archive.Load(headerFile, dataFile).ConfigureAwait(false))
             {
                 List<MS2File> files = archive.Files;
-#if DEBUG
-                for (int i = 0; i < files.Count; i++)
-                {
-                    MS2File file = files[i];
-                    Logger.Info($"Extracting file \"{file.Name}\", \"{FileEx.FormatStorage(file.Header.Size)}\". ({file.Header.Id}/{files.Count})");
-                    await ExtractFileAsync(destinationPath, file).ConfigureAwait(false);
-                }
-#else
+
                 Task[] tasks = new Task[files.Count];
                 for (int i = 0; i < files.Count; i++)
                 {
@@ -152,8 +162,23 @@ namespace MS2Extract
                     Logger.Info($"Extracting file \"{file.Name}\", \"{FileEx.FormatStorage(file.Header.Size)}\". ({file.Header.Id}/{files.Count})");
                     tasks[i] = ExtractFileAsync(destinationPath, file);
                 }
+
                 await Task.WhenAll(tasks).ConfigureAwait(false);
-#endif
+            }
+        }
+
+        private static async Task ExtractArchiveSync(string headerFile, string dataFile, string destinationPath)
+        {
+            using (MS2Archive archive = await MS2Archive.Load(headerFile, dataFile).ConfigureAwait(false))
+            {
+                List<MS2File> files = archive.Files;
+
+                for (int i = 0; i < files.Count; i++)
+                {
+                    MS2File file = files[i];
+                    Logger.Info($"Extracting file \"{file.Name}\", \"{FileEx.FormatStorage(file.Header.Size)}\". ({file.Header.Id}/{files.Count})");
+                    await ExtractFileAsync(destinationPath, file).ConfigureAwait(false);
+                }
             }
         }
 
@@ -164,7 +189,7 @@ namespace MS2Extract
                 Logger.Warning($"File number \"{file.Id}\", \"{FileEx.FormatStorage(file.Header.Size)}\" has no name and will be ignored.");
                 return;
             }
-            
+
             string fileDestinationPath = Path.Combine(destinationPath, file.Name);
 
             (Stream stream, bool shouldDispose) = await file.GetDecryptedStreamAsync().ConfigureAwait(false);
@@ -217,18 +242,23 @@ namespace MS2Extract
             sb.AppendLine("Extracts MapleStory2 archives in a given folder.");
             sb.AppendLine();
             sb.AppendLine("Usage: ");
-            sb.AppendLine("MS2Extract.exe <source> <destination>");
+            sb.AppendLine("MS2Extract.exe <source> <destination> [syncMode = Async] [logMode = Warning]");
             sb.AppendLine("<source> - either a directory to extract all archives, ");
             sb.AppendLine("either a specific archive.");
             sb.AppendLine("<destination> - the folder where all the files from");
             sb.AppendLine("the archive will be extracted.");
+            sb.AppendLine("<syncMode> - optional; \"Sync\" or \"Async\"");
+            sb.AppendLine("or 0 or 1 respectively.");
+            sb.AppendLine("Async uses as much CPU as possible while");
+            sb.AppendLine("Sync will only use one thread.");
+            sb.AppendLine("<logMode> - optional; Debug, Verbose, Info, Warning or Error");
 
             Console.WriteLine(sb.ToString());
         }
 
         private static bool ParseArgs(string[] args)
         {
-            if (args.Length < MinArgsLength)
+            if (args.Length < MinNumberArgs)
             {
                 Logger.Error("not enough args");
                 return false;
@@ -243,9 +273,14 @@ namespace MS2Extract
             SourcePath = Path.GetFullPath(args[0]);
             DestinationPath = Path.GetFullPath(args[1]);
 
-            if (args.Length > MinArgsLength)
+            if (args.Length >= OptionalNumberArgSyncMode)
             {
-                ArgsLogMode = (LogMode)Enum.Parse(typeof(LogMode), args[MinArgsLength + 0]);
+                ArgsSyncMode = (SyncMode)Enum.Parse(typeof(SyncMode), args[OptionalNumberArgSyncMode - 1]);
+
+                if (args.Length >= OptionalNumberArgLog)
+                {
+                    ArgsLogMode = (LogMode)Enum.Parse(typeof(LogMode), args[OptionalNumberArgLog - 1]);
+                }
             }
 
             return true;

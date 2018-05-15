@@ -1,21 +1,29 @@
-﻿using System;
+﻿using MiscUtils;
+using MS2Lib;
+using System;
 using System.IO;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
-using MiscUtils;
-using MS2Lib;
 using Logger = MiscUtils.Logging.SimpleLogger;
 using LogMode = MiscUtils.Logging.LogMode;
 
 namespace MS2Create
 {
+    public enum SyncMode
+    {
+        Sync = 0,
+        Async = 1,
+    }
+
     internal class Program
     {
         private const string HeaderFileExtension = "m2h";
         private const string DataFileExtension = "m2d";
 
-        private const int MinArgsLength = 4;
+        private const int MinNumberArgs = 4;
+        private const int OptionalNumberArgSyncMode = 5;
+        private const int OptionalNumberArgLog = 6;
 
         // args
         private static string SourcePath;
@@ -23,6 +31,7 @@ namespace MS2Create
         private static string ArchiveName;
         private static MS2CryptoMode CryptoMode;
         private static LogMode? ArgsLogMode;
+        private static SyncMode? ArgsSyncMode;
 
 #if DEBUG
         private static readonly StreamWriter StreamWriter = new StreamWriter("output.log");
@@ -34,6 +43,7 @@ namespace MS2Create
             Action<string, object[]> Out = (format, args) => StreamWriter.WriteLine(args == null ? format : String.Format(format, args));
             Logger.Out = MiscUtils.Logging.DebugLogger.Out = Out;
             Logger.LoggingLevel = LogMode.Debug;
+            ArgsSyncMode = SyncMode.Sync;
 #else
             Logger.LoggingLevel = LogMode.Warning;
 #endif
@@ -80,7 +90,14 @@ namespace MS2Create
             string dataPath = Path.ChangeExtension(dstArchive, DataFileExtension);
             Logger.Info($"Archiving folder \"{SourcePath}\" into \"{headerPath}\" and \"{dataPath}\"");
 
-            return CreateArchiveAsync(sourcePath, headerPath, dataPath);
+            if (ArgsSyncMode == SyncMode.Async)
+            {
+                return CreateArchiveAsync(sourcePath, headerPath, dataPath);
+            }
+            else //if (ArgsSyncMode == SyncMode.Sync)
+            {
+                return CreateArchiveSync(sourcePath, headerPath, dataPath);
+            }
         }
 
         private static async Task CreateArchiveAsync(string sourcePath, string headerFilePath, string dataFilePath)
@@ -100,6 +117,7 @@ namespace MS2Create
                 tasks[i] = Task.Run(() =>
                 {
                     var (filePath, relativePath) = filePaths[ic];
+
                     files[ic] = MS2File.Create(ic + 1u, relativePath, CompressionType.Zlib, CryptoMode, filePath);
                 });
             }
@@ -107,6 +125,26 @@ namespace MS2Create
             await Task.WhenAll(tasks).ConfigureAwait(false);
 
             await MS2Archive.Save(CryptoMode, files, headerFilePath, dataFilePath, RunMode.Async2).ConfigureAwait(false);
+        }
+
+        private static async Task CreateArchiveSync(string sourcePath, string headerFilePath, string dataFilePath)
+        {
+            if (!Directory.Exists(sourcePath))
+            {
+                throw new Exception($"Directory doesn't exist \"{sourcePath}\".");
+            }
+
+            var filePaths = GetFilesRelative(sourcePath);
+            MS2File[] files = new MS2File[filePaths.Length];
+
+            for (uint i = 0; i < filePaths.Length; i++)
+            {
+                var (filePath, relativePath) = filePaths[i];
+
+                files[i] = MS2File.Create(i + 1u, relativePath, CompressionType.Zlib, CryptoMode, filePath);
+            }
+
+            await MS2Archive.Save(CryptoMode, files, headerFilePath, dataFilePath, RunMode.Sync).ConfigureAwait(false);
         }
 
         private static (string FullPath, string RelativePath)[] GetFilesRelative(string path)
@@ -144,19 +182,24 @@ namespace MS2Create
             sb.AppendLine("Creates a MapleStory2 archive from a given folder.");
             sb.AppendLine();
             sb.AppendLine("Usage: ");
-            sb.AppendLine("MS2Create.exe <source> <destination> <archive name> <mode>");
+            sb.AppendLine("MS2Create.exe <source> <destination> <archive name> <mode> [syncMode = Async] [logMode = Warning]");
             sb.AppendLine("<source> - the folder to be archived.");
             sb.AppendLine("<destination> - the folder where the archive will be created.");
             sb.AppendLine("<archive name> - the name of the resulting archive.");
             sb.AppendLine("<mode> - the mode to use to encrypt the archive.");
             sb.AppendLine("List of available modes: MS2F, NS2F, OS2F, PS2F");
+            sb.AppendLine("<syncMode> - optional; \"Sync\" or \"Async\"");
+            sb.AppendLine("or 0 or 1 respectively.");
+            sb.AppendLine("Async uses as much CPU as possible while");
+            sb.AppendLine("Sync will only use one thread.");
+            sb.AppendLine("<logMode> - optional; Debug, Verbose, Info, Warning or Error");
 
             Console.WriteLine(sb.ToString());
         }
 
         private static bool ParseArgs(string[] args)
         {
-            if (args.Length < MinArgsLength)
+            if (args.Length < MinNumberArgs)
             {
                 Logger.Error("not enough args");
                 return false;
@@ -173,9 +216,14 @@ namespace MS2Create
             ArchiveName = args[2];
             CryptoMode = (MS2CryptoMode)Enum.Parse(typeof(MS2CryptoMode), args[3]);
 
-            if (args.Length > MinArgsLength)
+            if (args.Length >= OptionalNumberArgSyncMode)
             {
-                ArgsLogMode = (LogMode)Enum.Parse(typeof(LogMode), args[MinArgsLength + 0]);
+                ArgsSyncMode = (SyncMode)Enum.Parse(typeof(SyncMode), args[OptionalNumberArgSyncMode - 1]);
+
+                if (args.Length >= OptionalNumberArgLog)
+                {
+                    ArgsLogMode = (LogMode)Enum.Parse(typeof(LogMode), args[OptionalNumberArgLog - 1]);
+                }
             }
 
             return true;
