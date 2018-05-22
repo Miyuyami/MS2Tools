@@ -1,0 +1,6 @@
+[submodule "MiscUtils"]
+	path = MiscUtils
+	url = https://github.com/Miyuyami/MiscUtils.git
+[submodule "MS2Lib"]
+	path = MS2Lib
+	url = https://github.com/Miyuyami/MS2Lib.git

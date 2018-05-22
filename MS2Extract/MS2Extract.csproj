@@ -86,15 +86,14 @@
     <None Include="App.config" />
   </ItemGroup>
   <ItemGroup>
-    <ProjectReference Include="..\..\..\..\..\Users\Miyu\Documents\GitHub\MiscUtils\MiscUtils\MiscUtils.csproj">
-      <Project>{9778a7c2-4c51-4b53-be42-d0fc44f78bee}</Project>
+    <ProjectReference Include="..\MiscUtils\MiscUtils\MiscUtils.csproj">
+      <Project>{a741fe8f-4774-40d0-a9ef-d2d470ebcf00}</Project>
       <Name>MiscUtils</Name>
     </ProjectReference>
-    <ProjectReference Include="..\..\MS2Lib\MS2Lib\MS2Lib.csproj">
-      <Project>{e03e993c-7e8e-4fa3-88c1-d4d1dc081075}</Project>
+    <ProjectReference Include="..\MS2Lib\MS2Lib\MS2Lib.csproj">
+      <Project>{64ffd6b6-8b3d-4889-b03a-0eb9514c992d}</Project>
       <Name>MS2Lib</Name>
     </ProjectReference>
   </ItemGroup>
-  <ItemGroup />
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
 </Project>
