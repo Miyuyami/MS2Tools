@@ -3,7 +3,7 @@ Each tool has a help text showing up when ran with no arguments, check it out!
 
 The tools have no logic for handling low memory situations so make sure you have a decent amount of memory (RAM) free. I cannot help with anything related to "OutOfMemoryException" errors.
 
-I recommend to use the provided powershell scripts (with the necessary personal edits) for each tool.
+I recommend to use the provided powershell scripts (.ps1 files) (with the necessary personal edits) for each tool.
 By default the scripts are made to use syncMode 0 (Sync) so if you want faster extraction/creation you must set it to Async or 1.
 
 # MS2Extract
