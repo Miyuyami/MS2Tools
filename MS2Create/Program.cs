@@ -120,7 +120,7 @@ namespace MS2Create
 
             await Task.WhenAll(tasks).ConfigureAwait(false);
 
-            await archive.SaveAsync(headerFilePath, dataFilePath, true, f => GetCompressionTypeFromFileExtension(f.Info.Path, CompressionType.Zlib)).ConfigureAwait(false);
+            await archive.SaveAsync(headerFilePath, dataFilePath, true).ConfigureAwait(false);
         }
 
         private static void AddAndCreateFileToArchive(IMS2Archive archive, (string fullPath, string relativePath)[] filePaths, uint index)
@@ -144,7 +144,6 @@ namespace MS2Create
             }
 
             var filePaths = GetFilesRelative(sourcePath);
-            MS2File[] files = new MS2File[filePaths.Length];
             IMS2Archive archive = new MS2Archive(Repositories.Repos[CryptoMode]);
 
             for (uint i = 0; i < filePaths.Length; i++)
@@ -152,7 +151,7 @@ namespace MS2Create
                 AddAndCreateFileToArchive(archive, filePaths, i);
             }
 
-            await archive.SaveAsync(headerFilePath, dataFilePath, false, f => GetCompressionTypeFromFileExtension(f.Info.Path, CompressionType.Zlib)).ConfigureAwait(false);
+            await archive.SaveAsync(headerFilePath, dataFilePath, false).ConfigureAwait(false);
         }
 
         private static (string FullPath, string RelativePath)[] GetFilesRelative(string path)
@@ -173,7 +172,7 @@ namespace MS2Create
             return result;
         }
 
-        private static CompressionType GetCompressionTypeFromFileExtension(string filePath, CompressionType defaultCompressionType = CompressionType.None) =>
+        private static CompressionType GetCompressionTypeFromFileExtension(string filePath, CompressionType defaultCompressionType = CompressionType.Zlib) =>
             (Path.GetExtension(filePath)) switch
             {
                 ".png" => CompressionType.Png,
