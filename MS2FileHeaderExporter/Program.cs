@@ -43,7 +43,7 @@ namespace MS2FileHeaderExporter
         static async Task Main(string[] commandLineArgs)
         {
 #if DEBUG
-            Action<string, object[]> Out = (format, args) => StreamWriter.WriteLine(args == null ? format : String.Format(format, args));
+            static void Out(string format, object[] args) => StreamWriter.WriteLine(args == null ? format : String.Format(format, args));
             Logger.Out = MiscUtils.Logging.DebugLogger.Out = Out;
             Logger.LoggingLevel = LogMode.Debug;
 #else
@@ -169,21 +169,17 @@ namespace MS2FileHeaderExporter
 
         private static async Task ExportArchiveAsync(string headerFile, string dataFile, string destinationFilePath)
         {
-            using (var swExport = new StreamWriter(destinationFilePath))
-            using (MS2Archive archive = await MS2Archive.Load(headerFile, dataFile).ConfigureAwait(false))
-            {
-                List<MS2File> files = archive.Files;
+            using var swExport = new StreamWriter(destinationFilePath);
+            using IMS2Archive archive = await MS2Archive.GetAndLoadArchiveAsync(headerFile, dataFile).ConfigureAwait(false);
 
-                for (int i = 0; i < files.Count; i++)
-                {
-                    MS2File file = files[i];
-                    Logger.Info($"Exporting file \"{file.Name}\". ({file.Header.Id}/{files.Count})");
-                    await ExportFileAsync(swExport, file).ConfigureAwait(false);
-                }
+            foreach (var file in archive)
+            {
+                Logger.Info($"Exporting file \"{file.Name}\". ({file.Header.Id}/{archive.Count})");
+                await ExportFileAsync(swExport, file).ConfigureAwait(false);
             }
         }
 
-        private static Task ExportFileAsync(StreamWriter swExport, MS2File file)
+        private static Task ExportFileAsync(StreamWriter swExport, IMS2File file)
         {
             string fileName = file.Name;
             if (String.IsNullOrWhiteSpace(fileName))
@@ -193,24 +189,22 @@ namespace MS2FileHeaderExporter
             }
 
             uint id = file.Header.Id;
-            CompressionType typeId = file.CompressionType;
+            CompressionType typeId = file.Header.CompressionType;
 
             FileTypes.AddOrUpdate(Path.GetExtension(fileName), new HashSet<string>() { typeId.ToString() }, (_, v) => { v.Add(typeId.ToString()); return v; });
 
             string rootDirectory = PathEx.GetRootDirectory(fileName);
             if (!String.IsNullOrEmpty(rootDirectory))
             {
-                if (String.IsNullOrEmpty(file.InfoHeader.RootFolderId))
+                if (String.IsNullOrEmpty(file.Info.RootFolderId))
                 {
                     Logger.Warning($"Root folder id is empty but it has a root folder ({rootDirectory})!");
                 }
 
-                RootFolderIds.AddOrUpdate(rootDirectory, new HashSet<string>() { file.InfoHeader.RootFolderId }, (_, v) => { v.Add(file.InfoHeader.RootFolderId); return v; });
+                RootFolderIds.AddOrUpdate(rootDirectory, new HashSet<string>() { file.Info.RootFolderId }, (_, v) => { v.Add(file.Info.RootFolderId); return v; });
             }
 
-            int propCount = file.InfoHeader.Properties.Count;
-            string info = String.Join(",", file.InfoHeader.Properties);
-            return swExport.WriteLineAsync($"{id:d6} - Type:{typeId}; Properties:{propCount}; Info={info}");
+            return swExport.WriteLineAsync($"{id:d6} - Type:{typeId}; Info_Id:{file.Info.Id}; Info_Path={file.Info.Path}; Info_RootFolderId={file.Info.RootFolderId}");
         }
 
         private static IEnumerable<(string headerFile, string dataFile)> GetFiles(string path)
@@ -243,16 +237,16 @@ namespace MS2FileHeaderExporter
             var sb = new StringBuilder();
 
             sb.AppendLine();
-            sb.AppendLine("MS2FileHeaderExporter Copyright (C) 2017-2018 Miyu");
+            sb.AppendLine("MS2FileHeaderExporter Copyright (C) Miyu");
             sb.AppendLine("Description: ");
             sb.AppendLine("Exports the file headers from a given MapleStory2 archive.");
             sb.AppendLine();
             sb.AppendLine("Usage: ");
             sb.AppendLine("MS2FileHeaderExporter.exe <source> <destination>");
             sb.AppendLine("<source> - either a directory to export all");
-            sb.AppendLine("archives' files, either a specific archive.");
+            sb.AppendLine("\tarchives' files, either a specific archive.");
             sb.AppendLine("<destination> - the folder where all the file data");
-            sb.AppendLine("from the archive will be exported.");
+            sb.AppendLine("\tfrom the archive will be exported.");
 
             Console.WriteLine(sb.ToString());
         }

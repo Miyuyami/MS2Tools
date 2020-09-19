@@ -1,10 +1,10 @@
-﻿using MiscUtils;
-using MS2Lib;
-using System;
+﻿using System;
 using System.IO;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
+using MiscUtils;
+using MS2Lib;
 using Logger = MiscUtils.Logging.SimpleLogger;
 using LogMode = MiscUtils.Logging.LogMode;
 
@@ -40,7 +40,7 @@ namespace MS2Create
         static async Task Main(string[] commandLineArgs)
         {
 #if DEBUG
-            Action<string, object[]> Out = (format, args) => StreamWriter.WriteLine(args == null ? format : String.Format(format, args));
+            static void Out(string format, object[] args) => StreamWriter.WriteLine(args == null ? format : String.Format(format, args));
             Logger.Out = MiscUtils.Logging.DebugLogger.Out = Out;
             Logger.LoggingLevel = LogMode.Debug;
             ArgsSyncMode = SyncMode.Sync;
@@ -110,21 +110,30 @@ namespace MS2Create
             var filePaths = GetFilesRelative(sourcePath);
             MS2File[] files = new MS2File[filePaths.Length];
             var tasks = new Task[filePaths.Length];
+            IMS2Archive archive = new MS2Archive(Repositories.Repos[CryptoMode]);
 
             for (uint i = 0; i < filePaths.Length; i++)
             {
                 uint ic = i;
-                tasks[i] = Task.Run(() =>
-                {
-                    var (filePath, relativePath) = filePaths[ic];
-
-                    files[ic] = MS2File.Create(ic + 1u, relativePath, CompressionType.Zlib, CryptoMode, filePath);
-                });
+                tasks[i] = Task.Run(() => AddAndCreateFileToArchive(archive, filePaths, ic));
             }
 
             await Task.WhenAll(tasks).ConfigureAwait(false);
 
-            await MS2Archive.Save(CryptoMode, files, headerFilePath, dataFilePath, RunMode.Async2).ConfigureAwait(false);
+            await archive.SaveAsync(headerFilePath, dataFilePath, true, f => GetCompressionTypeFromFileExtension(f.Info.Path, CompressionType.Zlib)).ConfigureAwait(false);
+        }
+
+        private static void AddAndCreateFileToArchive(IMS2Archive archive, (string fullPath, string relativePath)[] filePaths, uint index)
+        {
+            var (filePath, relativePath) = filePaths[index];
+
+            uint id = index + 1;
+            FileStream fsFile = File.OpenRead(filePath);
+            IMS2FileInfo info = new MS2FileInfo(id.ToString(), relativePath);
+            IMS2FileHeader header = new MS2FileHeader(fsFile.Length, id, 0, GetCompressionTypeFromFileExtension(filePath));
+            IMS2File file = new MS2File(archive, fsFile, info, header, false);
+
+            archive.Add(file);
         }
 
         private static async Task CreateArchiveSync(string sourcePath, string headerFilePath, string dataFilePath)
@@ -136,15 +145,14 @@ namespace MS2Create
 
             var filePaths = GetFilesRelative(sourcePath);
             MS2File[] files = new MS2File[filePaths.Length];
+            IMS2Archive archive = new MS2Archive(Repositories.Repos[CryptoMode]);
 
             for (uint i = 0; i < filePaths.Length; i++)
             {
-                var (filePath, relativePath) = filePaths[i];
-
-                files[i] = MS2File.Create(i + 1u, relativePath, CompressionType.Zlib, CryptoMode, filePath);
+                AddAndCreateFileToArchive(archive, filePaths, i);
             }
 
-            await MS2Archive.Save(CryptoMode, files, headerFilePath, dataFilePath, RunMode.Sync).ConfigureAwait(false);
+            await archive.SaveAsync(headerFilePath, dataFilePath, false, f => GetCompressionTypeFromFileExtension(f.Info.Path, CompressionType.Zlib)).ConfigureAwait(false);
         }
 
         private static (string FullPath, string RelativePath)[] GetFilesRelative(string path)
@@ -155,7 +163,7 @@ namespace MS2Create
             }
 
             string[] files = Directory.GetFiles(path, "*.*", SearchOption.AllDirectories);
-            var result = new(string FullPath, string RelativePath)[files.Length];
+            var result = new (string FullPath, string RelativePath)[files.Length];
 
             for (int i = 0; i < files.Length; i++)
             {
@@ -165,12 +173,14 @@ namespace MS2Create
             return result;
         }
 
-        private static string GetDataFileFromHeaderFile(string headerFile)
-        {
-            string dataFile = Path.ChangeExtension(headerFile, DataFileExtension);
-
-            return dataFile;
-        }
+        private static CompressionType GetCompressionTypeFromFileExtension(string filePath, CompressionType defaultCompressionType = CompressionType.None) =>
+            (Path.GetExtension(filePath)) switch
+            {
+                ".png" => CompressionType.Png,
+                ".usm" => CompressionType.Usm,
+                ".zlib" => CompressionType.Zlib,
+                _ => defaultCompressionType,
+            };
 
         private static void DisplayArgsHelp()
         {

@@ -1,12 +1,12 @@
-﻿using MiscUtils;
-using MiscUtils.IO;
-using MS2Lib;
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
+using MiscUtils;
+using MiscUtils.IO;
+using MS2Lib;
 using Logger = MiscUtils.Logging.SimpleLogger;
 using LogMode = MiscUtils.Logging.LogMode;
 
@@ -40,7 +40,7 @@ namespace MS2Extract
         static async Task Main(string[] commandLineArgs)
         {
 #if DEBUG
-            Action<string, object[]> Out = (format, args) => StreamWriter.WriteLine(args == null ? format : String.Format(format, args));
+            static void Out(string format, object[] args) => StreamWriter.WriteLine(args == null ? format : String.Format(format, args));
             Logger.Out = MiscUtils.Logging.DebugLogger.Out = Out;
             Logger.LoggingLevel = LogMode.Debug;
             ArgsSyncMode = SyncMode.Sync;
@@ -151,60 +151,42 @@ namespace MS2Extract
 
         private static async Task ExtractArchiveAsync(string headerFile, string dataFile, string destinationPath)
         {
-            using (MS2Archive archive = await MS2Archive.Load(headerFile, dataFile).ConfigureAwait(false))
+            using IMS2Archive archive = await MS2Archive.GetAndLoadArchiveAsync(headerFile, dataFile).ConfigureAwait(false);
+
+            IEnumerable<Task> tasks = archive.Select(file =>
             {
-                List<MS2File> files = archive.Files;
+                Logger.Info($"Extracting file \"{file.Name}\", \"{FileEx.FormatStorage(file.Header.Size.Size)}\". ({file.Header.Id}/{archive.Count})");
 
-                Task[] tasks = new Task[files.Count];
-                for (int i = 0; i < files.Count; i++)
-                {
-                    MS2File file = files[i];
-                    Logger.Info($"Extracting file \"{file.Name}\", \"{FileEx.FormatStorage(file.Header.Size)}\". ({file.Header.Id}/{files.Count})");
-                    tasks[i] = ExtractFileAsync(destinationPath, file);
-                }
+                return ExtractFileAsync(destinationPath, file);
+            });
 
-                await Task.WhenAll(tasks).ConfigureAwait(false);
-            }
+            await Task.WhenAll(tasks).ConfigureAwait(false);
         }
 
         private static async Task ExtractArchiveSync(string headerFile, string dataFile, string destinationPath)
         {
-            using (MS2Archive archive = await MS2Archive.Load(headerFile, dataFile).ConfigureAwait(false))
-            {
-                List<MS2File> files = archive.Files;
+            using IMS2Archive archive = await MS2Archive.GetAndLoadArchiveAsync(headerFile, dataFile).ConfigureAwait(false);
 
-                for (int i = 0; i < files.Count; i++)
-                {
-                    MS2File file = files[i];
-                    Logger.Info($"Extracting file \"{file.Name}\", \"{FileEx.FormatStorage(file.Header.Size)}\". ({file.Header.Id}/{files.Count})");
-                    await ExtractFileAsync(destinationPath, file).ConfigureAwait(false);
-                }
+            foreach (var file in archive)
+            {
+                Logger.Info($"Extracting file \"{file.Name}\", \"{FileEx.FormatStorage(file.Header.Size.Size)}\". ({file.Header.Id}/{archive.Count})");
+                await ExtractFileAsync(destinationPath, file).ConfigureAwait(false);
             }
         }
 
-        private static async Task ExtractFileAsync(string destinationPath, MS2File file)
+        private static async Task ExtractFileAsync(string destinationPath, IMS2File file)
         {
             if (String.IsNullOrWhiteSpace(file.Name))
             {
-                Logger.Warning($"File number \"{file.Id}\", \"{FileEx.FormatStorage(file.Header.Size)}\" has no name and will be ignored.");
+                Logger.Warning($"File number \"{file.Id}\", \"{FileEx.FormatStorage(file.Header.Size.Size)}\" has no name and will be ignored.");
                 return;
             }
 
             string fileDestinationPath = Path.Combine(destinationPath, file.Name);
 
-            (Stream stream, bool shouldDispose) = await file.GetDecryptedStreamAsync().ConfigureAwait(false);
+            using Stream stream = await file.GetStreamAsync().ConfigureAwait(false);
 
-            try
-            {
-                await stream.CopyToAsync(fileDestinationPath).ConfigureAwait(false);
-            }
-            finally
-            {
-                if (shouldDispose)
-                {
-                    stream.Dispose();
-                }
-            }
+            await stream.CopyToAsync(fileDestinationPath).ConfigureAwait(false);
         }
 
         private static IEnumerable<(string headerFile, string dataFile)> GetFiles(string path)
@@ -237,20 +219,20 @@ namespace MS2Extract
             var sb = new StringBuilder();
 
             sb.AppendLine();
-            sb.AppendLine("MS2Extract Copyright (C) 2017-2018 Miyu");
+            sb.AppendLine("MS2Extract Copyright (C) Miyu");
             sb.AppendLine("Description: ");
             sb.AppendLine("Extracts MapleStory2 archives in a given folder.");
             sb.AppendLine();
             sb.AppendLine("Usage: ");
             sb.AppendLine("MS2Extract.exe <source> <destination> [syncMode = Async] [logMode = Warning]");
             sb.AppendLine("<source> - either a directory to extract all archives, ");
-            sb.AppendLine("either a specific archive.");
+            sb.AppendLine("\teither a specific archive.");
             sb.AppendLine("<destination> - the folder where all the files from");
-            sb.AppendLine("the archive will be extracted.");
+            sb.AppendLine("\tthe archive will be extracted.");
             sb.AppendLine("<syncMode> - optional; \"Sync\" or \"Async\"");
-            sb.AppendLine("or 0 or 1 respectively.");
-            sb.AppendLine("Async uses as much CPU as possible while");
-            sb.AppendLine("Sync will only use one thread.");
+            sb.AppendLine("\tor 0 or 1 respectively.");
+            sb.AppendLine("\tAsync uses as much CPU as possible while");
+            sb.AppendLine("\tSync will only use one thread.");
             sb.AppendLine("<logMode> - optional; Debug, Verbose, Info, Warning or Error");
 
             Console.WriteLine(sb.ToString());
