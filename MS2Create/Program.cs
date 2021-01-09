@@ -120,7 +120,7 @@ namespace MS2Create
 
             await Task.WhenAll(tasks).ConfigureAwait(false);
 
-            await archive.SaveAsync(headerFilePath, dataFilePath, true).ConfigureAwait(false);
+            await archive.SaveConcurrentlyAsync(headerFilePath, dataFilePath).ConfigureAwait(false);
         }
 
         private static void AddAndCreateFileToArchive(IMS2Archive archive, (string fullPath, string relativePath)[] filePaths, uint index)
@@ -151,7 +151,7 @@ namespace MS2Create
                 AddAndCreateFileToArchive(archive, filePaths, i);
             }
 
-            await archive.SaveAsync(headerFilePath, dataFilePath, false).ConfigureAwait(false);
+            await archive.SaveAsync(headerFilePath, dataFilePath).ConfigureAwait(false);
         }
 
         private static (string FullPath, string RelativePath)[] GetFilesRelative(string path)
